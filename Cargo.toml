@@ -1,0 +1,10 @@
+[package]
+name = "trainchinese2"
+version = "0.1.0"
+authors = ["Alejandro Sánchez <contacto@alsanchez.es>"]
+
+[dependencies]
+hyper = "0.7.1"
+regex = "0.1"
+marksman_escape = "0.1.2"
+argparse = "*"

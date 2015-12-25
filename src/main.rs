@@ -9,7 +9,7 @@ use std::io::Write;
 use regex::Regex;
 use hyper::Client;
 use marksman_escape::Unescape;
-use argparse::{ArgumentParser, Store};
+use argparse::{ArgumentParser, Store, StoreTrue};
 
 struct SearchResult
 {
@@ -25,17 +25,28 @@ fn main()
     let mut tsv_path = String::new();
     let mut anki_collection_path = String::new();
     let mut query = String::new();
+    let mut extended = false;
     {
         let mut ap = ArgumentParser::new();
         ap.refer(&mut tsv_path).add_argument("tsvPath", Store, "TSV file path").required();
         ap.refer(&mut anki_collection_path).add_argument("ankiCollectionPath", Store, "Anki collection directory").required();
         ap.refer(&mut query).add_argument("pinyin", Store, "Query").required();
+        ap.refer(&mut extended).add_option(&["-e", "--extended"], StoreTrue, "Show extended results");
         ap.parse_args_or_exit()
     }
     
-    let html = get_html(&query);
-    let filtered_html = trim_html(&html);
-    let matches = parse_search_results(filtered_html);
+    let mut html = get_html(&query);
+    if !extended
+    {
+        html = trim_html(&html).to_string();
+    }
+    let matches = parse_search_results(&html);
+    if matches.len() == 0
+    {
+        println!("No results found");
+        return;
+    }
+
     for (i, m) in matches.iter().take(10).enumerate()
     {
         println!("[{}] {}\t{}\t{}", i, m.hanzi, m.pinyin, m.meaning);
@@ -128,12 +139,11 @@ fn get_download_url(item: &SearchResult) -> String
     return format!("http://www.trainchinese.com/v1/word_lists/tc_words/w_dirs/w{}/{}", prefix, item.audio_name);
 }
 
-
 fn parse_search_results(html: &str) -> Vec<SearchResult>
 {
     let mut search_results = Vec::new();
     
-    let rg = r#"<tr>.+?<div class='leadXXL chinese'>(.+?)</div>.+?</span>.+?<span class="pinyin">([^>]+)</span>.+?color:#0066FF'> ([^>]+)</span>.+?playAudio\("([^"]+).+?,(\d+)\)"#;
+    let rg = r#"<tr>.+?<div class=['"]leadXXL chinese['"]>(.+?)</div>.+?<span class="pinyin">([^>]+)</span>.+?color:#0066FF['"]> ([^>]+)</span>.+?playAudio\((?:"|&quot;)(.+?)(?:"|&quot;).+?,(\d+)\)"#;
     let re = Regex::new(rg).unwrap();
     let span_re = Regex::new(r#"</?span[^>]*>"#).unwrap();
     for cap in re.captures_iter(html)
